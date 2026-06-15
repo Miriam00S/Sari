@@ -53,6 +53,7 @@ function createCard(channel) {
     return article;
 }
 
+
 function renderChannels(channels) {
     if (!mainEl) return;
     mainEl.innerHTML = '';
@@ -61,14 +62,64 @@ function renderChannels(channels) {
     mainEl.appendChild(fragment);
 }
 
+let channelsData = []; // przechowuje oryginalne dane
+
+function getNumeric(v) {
+    if (v == null) return NaN;
+    const s = String(v).replace(/[^\d.-]/g, '');
+    const n = Number(s);
+    return Number.isNaN(n) ? NaN : n;
+}
+
+function sortAndRender(criteria) {
+    if (!channelsData || !channelsData.length) return;
+    const copy = channelsData.slice();
+
+    switch (criteria) {
+        case 'title':
+            copy.sort((a, b) => String(a.title || '').localeCompare(String(b.title || ''), 'pl', { sensitivity: 'base' }));
+            break;
+        case 'subscribers':
+            copy.sort((a, b) => (getNumeric(b.statistics?.subscriberCount) || 0) - (getNumeric(a.statistics?.subscriberCount) || 0));
+            break;
+        case 'videos':
+            copy.sort((a, b) => (getNumeric(b.statistics?.videoCount) || 0) - (getNumeric(a.statistics?.videoCount) || 0));
+            break;
+        case 'views':
+            copy.sort((a, b) => (getNumeric(b.statistics?.viewCount) || 0) - (getNumeric(a.statistics?.viewCount) || 0));
+            break;
+        default:
+            // domyślnie przywróć oryginalny porządek
+            break;
+    }
+
+    renderChannels(copy);
+}
+
+function getSelectedSortCriteria() {
+    const checked = document.querySelector('input[name="sort"]:checked');
+    if (!checked) return null;
+    if (checked.id === 'sort-title') return 'title';
+    if (checked.id === 'sort-subscribers') return 'subscribers';
+    if (checked.id === 'sort-videos') return 'videos';
+    if (checked.id === 'sort-views') return 'views';
+    return null;
+}
+
+// zamień/rozszerz loadChannels tak, żeby zapisywała channelsData
 function loadChannels(url = './channels.json') {
     return fetch(url)
-        .then(r => {
-            if (!r.ok) throw new Error('Fetch error: ' + r.status);
+        .then(async r => {
+            if (!r.ok) {
+                const body = await r.text().catch(()=>'<no body>');
+                throw new Error('Fetch error: ' + r.status + ' — ' + body);
+            }
             return r.json();
         })
         .then(data => {
-            renderChannels(Array.isArray(data) ? data : (data.items || []));
+            channelsData = Array.isArray(data) ? data : (data.items || []);
+            // początkowy render
+            renderChannels(channelsData);
             return data;
         })
         .catch(err => {
@@ -77,6 +128,30 @@ function loadChannels(url = './channels.json') {
             throw err;
         });
 }
+
+document.addEventListener('DOMContentLoaded', () => {
+    // nasłuch na zmiany radio
+    document.querySelectorAll('input[name="sort"]').forEach(radio => {
+        radio.addEventListener('change', () => {
+            const crit = getSelectedSortCriteria();
+            sortAndRender(crit);
+        });
+    });
+
+    // przycisk Clear — odznacza i przywraca oryginalny porządek
+    const clearBtn = document.querySelector('.sort .button');
+    if (clearBtn) {
+        clearBtn.addEventListener('click', () => {
+            document.querySelectorAll('input[name="sort"]').forEach(r => r.checked = false);
+            renderChannels(channelsData);
+        });
+    }
+
+    // auto-load (jeśli nie masz już innego auto-loada)
+    if (mainEl && channelsData.length === 0) {
+        loadChannels().catch(()=>{});
+    }
+});
 
 // utility
 function shorten(text, max) {
