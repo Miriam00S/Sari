@@ -38,7 +38,17 @@ function createCard(channel) {
         </div>
     `;
 
+    const thumb = article.querySelector('.thumb');
 
+    thumb?.addEventListener('click', () => {
+        const url = new URL(channel.customUrl);
+
+        url.searchParams.set('utm_source', 'channels_page');
+        url.searchParams.set('utm_medium', 'thumbnail');
+        url.searchParams.set('utm_timestamp', Date.now());
+
+        window.open(url.toString(), '_blank', 'noopener,noreferrer');
+    });
 
     return article;
 }
