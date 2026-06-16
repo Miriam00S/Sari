@@ -63,7 +63,7 @@ function createCard(channel) {
             url.searchParams.set('utm_timestamp', Date.now());
             window.open(url.toString(), '_blank', 'noopener,noreferrer');
         } catch (e) {
-            // ignore invalid URL
+
             console.warn('Invalid URL for channel:', target);
         }
     });
@@ -126,7 +126,7 @@ function getSelectedSortCriteria() {
     return null;
 }
 
-// loadChannels now saves channelsData
+// loadChannels saves channelsData
 function loadChannels(url = './channels.json') {
     return fetch(url)
         .then(async r => {
@@ -149,6 +149,175 @@ function loadChannels(url = './channels.json') {
         });
 }
 
+// helper: normalize string (lowercase + map Polish diacritics -> base letters)
+function normalizeText(s) {
+  if (s == null) return '';
+  return String(s)
+    .toLowerCase()
+    .replace(/ą/g, 'a')
+    .replace(/ć/g, 'c')
+    .replace(/ę/g, 'e')
+    .replace(/ł/g, 'l')
+    .replace(/ń/g, 'n')
+    .replace(/ó/g, 'o')
+    .replace(/ś/g, 's')
+    .replace(/ż/g, 'z')
+    .replace(/ź/g, 'z')
+    // also replace composed variants just in case
+    .replace(/Ą/g, 'a')
+    .replace(/Ć/g, 'c')
+    .replace(/Ę/g, 'e')
+    .replace(/Ł/g, 'l')
+    .replace(/Ń/g, 'n')
+    .replace(/Ó/g, 'o')
+    .replace(/Ś/g, 's')
+    .replace(/Ż/g, 'z')
+    .replace(/Ź/g, 'z')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+const filterInput = document.querySelector('.filter__input');
+const suggestionsEl = document.querySelector('.filter__suggestions');
+
+function updateSuggestions(query) {
+  if (!suggestionsEl) return;
+  const q = normalizeText(query);
+  if (!q) {
+    suggestionsEl.innerHTML = '';
+    suggestionsEl.setAttribute('aria-hidden', 'true');
+    return;
+  }
+  // find up to 8 matching channel titles (by normalized title)
+  const matches = (channelsData || [])
+    .map(ch => ({ title: ch.title || '', ch }))
+    .map(o => ({ title: o.title, norm: normalizeText(o.title), ch: o.ch }))
+    .filter(o => o.norm.includes(q))
+    .slice(0, 8);
+
+  if (!matches.length) {
+    suggestionsEl.innerHTML = '';
+    suggestionsEl.setAttribute('aria-hidden', 'true');
+    return;
+  }
+
+  suggestionsEl.innerHTML = matches.map((m, idx) => {
+    // highlight matched
+    return `<li role="option" data-index="${idx}" data-title="${escapeHtml(m.title)}">${escapeHtml(m.title)}</li>`;
+  }).join('');
+  suggestionsEl.setAttribute('aria-hidden', 'false');
+}
+
+// filter channels by query (match only normalized title to stay consistent with suggestions)
+function filterChannelsByQuery(query) {
+  const q = normalizeText(query);
+  if (!q) return channelsData.slice();
+  return (channelsData || []).filter(ch => {
+    const title = normalizeText(ch.title || ch.localized?.title || '');
+    return title.includes(q);
+  });
+}
+
+// debounce helper
+function debounce(fn, wait = 120) {
+  let t;
+  return (...args) => {
+    clearTimeout(t);
+    t = setTimeout(() => fn(...args), wait);
+  };
+}
+
+// input listener
+if (filterInput) {
+  let suggestionActiveIndex = -1;
+
+  // helper: highlight a suggestion by index
+  function highlightSuggestion(index) {
+    if (!suggestionsEl) return;
+    const items = Array.from(suggestionsEl.querySelectorAll('li'));
+    items.forEach((li, i) => {
+      if (i === index) li.setAttribute('data-highlight', 'true');
+      else li.removeAttribute('data-highlight');
+    });
+    if (index >= 0 && items[index]) {
+      items[index].scrollIntoView({ block: 'nearest' });
+      suggestionActiveIndex = index;
+    } else {
+      suggestionActiveIndex = -1;
+    }
+  }
+
+  const onInput = debounce(() => {
+    const q = filterInput.value;
+    updateSuggestions(q);
+    const filtered = filterChannelsByQuery(q);
+    renderChannels(filtered);
+    // reset active suggestion when user types
+    highlightSuggestion(-1);
+  }, 120);
+
+  filterInput.addEventListener('input', onInput);
+
+  // click on suggestion
+  suggestionsEl?.addEventListener('click', (ev) => {
+    const li = ev.target.closest('li');
+    if (!li) return;
+    const index = Number(li.getAttribute('data-index') || 0);
+    highlightSuggestion(index);
+    const title = li.getAttribute('data-title') || li.textContent;
+    filterInput.value = title;
+    suggestionsEl.setAttribute('aria-hidden', 'true');
+    const filtered = filterChannelsByQuery(title);
+    renderChannels(filtered);
+  });
+
+  // keyboard navigation works while input has focus:
+  filterInput.addEventListener('keydown', (ev) => {
+    if (!suggestionsEl) return;
+    const visible = suggestionsEl.getAttribute('aria-hidden') === 'false';
+    const items = suggestionsEl.querySelectorAll('li');
+
+    if (ev.key === 'Escape') {
+      suggestionsEl.setAttribute('aria-hidden', 'true');
+      highlightSuggestion(-1);
+      return;
+    }
+
+    if (!visible || items.length === 0) return;
+
+    if (ev.key === 'ArrowDown') {
+      ev.preventDefault();
+      const next = suggestionActiveIndex + 1 >= items.length ? 0 : suggestionActiveIndex + 1;
+      highlightSuggestion(next);
+    } else if (ev.key === 'ArrowUp') {
+      ev.preventDefault();
+      const prev = suggestionActiveIndex - 1 < 0 ? items.length - 1 : suggestionActiveIndex - 1;
+      highlightSuggestion(prev);
+    } else if (ev.key === 'Enter') {
+      ev.preventDefault();
+      const idx = suggestionActiveIndex >= 0 ? suggestionActiveIndex : 0;
+      const li = items[idx];
+      if (!li) return;
+      const title = li.getAttribute('data-title') || li.textContent;
+      filterInput.value = title;
+      suggestionsEl.setAttribute('aria-hidden', 'true');
+      highlightSuggestion(-1);
+      const filtered = filterChannelsByQuery(title);
+      renderChannels(filtered);
+    }
+  });
+}
+
+// clear button - clear input filter
+const clearBtn = document.querySelector('.sort .button');
+if (clearBtn) {
+  clearBtn.addEventListener('click', () => {
+    if (filterInput) filterInput.value = '';
+    if (suggestionsEl) suggestionsEl.setAttribute('aria-hidden', 'true');
+    renderChannels(channelsData);
+  });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     // listen for radio changes
     document.querySelectorAll('input[name="sort"]').forEach(radio => {
@@ -158,7 +327,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // Clear button — uncheck radios and restore original order
+    // Clear button — clear checked filters
     const clearBtn = document.querySelector('.sort .button');
     if (clearBtn) {
         clearBtn.addEventListener('click', () => {
@@ -167,7 +336,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // click on sort icon -> reverse current rendering order
+    // click on sort icon - reverse current rendering order
     const sortIcon = document.querySelector('.sort__icon');
     if (sortIcon) {
         sortIcon.addEventListener('click', () => {
