@@ -109,10 +109,10 @@ button:-moz-focusring {
   text-size-adjust: 100%;
 }
 
+/* Override click / active background on choice label */
 .choice + .choice__label:active {
-  background-color: #fff;
-  border-radius: 2px;
-  opacity: .3;
+  background-color: transparent; /* usuń biały background podczas kliknięcia */
+  opacity: 1;
 }
 
 .choice + .choice__label:before {
@@ -162,6 +162,12 @@ button:-moz-focusring {
 
 .choice:checked + .choice__label:before {
   border-color: #1bb826;
+}
+
+/* Ensure checked state has intended background (explicit) */
+.choice:checked + .choice__label {
+  background: none;
+  color: inherit;
 }
 
 .choice--radio + .choice__label:before {
@@ -244,6 +250,32 @@ button:-moz-focusring {
 .wrapper__header {
   order: 0;
 }
+
+/* header row: title left, icon right */
+.wrapper__header .header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+/* h1*/
+.wrapper__header .header {
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  padding: 0 12px;
+}
+
+/* header icon (night mode) */
+.header__icon {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  cursor: pointer;
+  display: inline-block;
+}
+
 
 .wrapper__filter {
   order: 1;
@@ -444,3 +476,113 @@ main {
 @media (max-width: 544px) {
   .filter__suggestions { max-height: 160px; }
 }
+
+
+/* Night / dark mode */
+
+body.dark {
+  background: #0f1113;
+  color: #e6eef6;
+}
+
+body.dark .wrapper {
+  background: #0f1113;
+}
+
+body.dark .channel-card {
+  background: #16181a;
+  color: #e6eef6;
+}
+
+body.dark .channel-card .title,
+body.dark .channel-card .meta_item_value {
+  color: #fff;
+}
+
+body.dark .meta_item_title {
+  color: #9aa4b2;
+}
+
+body.dark .header,
+body.dark .sort__header h3 {
+  color: #e6eef6;
+}
+
+/* keep slightly brighter icons in dark mode */
+body.dark .header__icon,
+body.dark .sort__icon {
+  filter: invert(1) brightness(2) contrast(1.05);
+  -webkit-filter: invert(1) brightness(2) contrast(1.05);
+}
+
+body.dark .filter {
+  background: rgb(22, 24, 26)
+}
+
+body.dark .filter__input {
+  background: transparent;
+  color: #e6eef6;
+  outline: none;
+}
+
+body.dark .filter__input::placeholder {
+  color: rgba(230,238,246,0.5);
+}
+
+body.dark .filter__suggestions {
+  background: #151719;
+  color: #e6eef6;
+  border: 1px solid rgba(255,255,255,0.04);
+}
+
+body.dark .filter__suggestions li {
+  color: #a5a7a7;
+}
+
+body.dark .filter__suggestions li:hover,
+body.dark .filter__suggestions li[data-highlight="true"] {
+  background: rgba(255,255,255,0.03);
+  color: #e6eef6;
+}
+
+body.dark .filter__input {
+  background: #0e1113;
+  color: #e6eef6;
+  border: 1px solid rgba(255,255,255,0.06);
+}
+
+body.dark .sort {
+  background: rgb(22, 24, 26);
+}
+
+body.dark .sort__header h3 {
+  color: #e6eef6;
+}
+
+/* options and labels */
+body.dark .sort__options,
+body.dark .choice + .choice__label {
+  color: #dbe6f0;
+}
+
+/* radio/checkbox box */
+body.dark .choice + .choice__label:before {
+  border-color: rgba(232, 224, 224, 0.79);
+}
+
+/* hover on labels */
+body.dark .choice + .choice__label:hover:before,
+body.dark .choice:hover + .choice__label:before {
+  border-color: rgb(253, 253, 253);
+}
+
+body.dark .filter__input,
+body.dark .filter__input:focus,
+body.dark .filter__input:hover {
+  transition: none !important;
+}
+
+body.dark .filter {
+  transition: none !important;
+}
+

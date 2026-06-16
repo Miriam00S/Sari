@@ -333,37 +333,63 @@ if (clearBtn) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    // listen for radio changes
-    document.querySelectorAll('input[name="sort"]').forEach(radio => {
-        radio.addEventListener('change', () => {
-            const crit = getSelectedSortCriteria();
-            sortAndRender(crit);
-        });
+  // listen for radio changes
+  document.querySelectorAll('input[name="sort"]').forEach(radio => {
+      radio.addEventListener('change', () => {
+          const crit = getSelectedSortCriteria();
+          sortAndRender(crit);
+      });
+  });
+
+  // Clear button — clear checked filters
+  const clearBtn = document.querySelector('.sort .button');
+  if (clearBtn) {
+      clearBtn.addEventListener('click', () => {
+          document.querySelectorAll('input[name="sort"]').forEach(r => r.checked = false);
+          renderChannels(channelsData);
+      });
+  }
+
+  // click on sort icon - reverse current rendering order
+  const sortIcon = document.querySelector('.sort__icon');
+  if (sortIcon) {
+      sortIcon.addEventListener('click', () => {
+          if (!displayedChannels || !displayedChannels.length) return;
+          displayedChannels.reverse();
+          renderChannels(displayedChannels);
+      });
+  }
+
+  // Night mode toggle: remember choice in localStorage
+  const nightBtn = document.querySelector('.header__icon--night');
+  function applyNightMode(enabled) {
+    document.body.classList.toggle('dark', !!enabled);
+    try {
+      if (enabled) localStorage.setItem('nightMode', '1');
+      else localStorage.removeItem('nightMode');
+    } catch (e) { /* ignore storage errors */ }
+  }
+
+  if (nightBtn) {
+    nightBtn.addEventListener('click', () => {
+      applyNightMode(!document.body.classList.contains('dark'));
     });
+  }
 
-    // Clear button — clear checked filters
-    const clearBtn = document.querySelector('.sort .button');
-    if (clearBtn) {
-        clearBtn.addEventListener('click', () => {
-            document.querySelectorAll('input[name="sort"]').forEach(r => r.checked = false);
-            renderChannels(channelsData);
-        });
-    }
+  // initialize from storage (or system preference fallback)
+  const stored = (() => {
+    try { return localStorage.getItem('nightMode'); } catch (e) { return null; }
+  })();
+  if (stored !== null) {
+    applyNightMode(stored === '1');
+  } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+    applyNightMode(true);
+  }
 
-    // click on sort icon - reverse current rendering order
-    const sortIcon = document.querySelector('.sort__icon');
-    if (sortIcon) {
-        sortIcon.addEventListener('click', () => {
-            if (!displayedChannels || !displayedChannels.length) return;
-            displayedChannels.reverse();
-            renderChannels(displayedChannels);
-        });
-    }
-
-    // auto-load (if not loaded elsewhere)
-    if (mainEl && channelsData.length === 0) {
-        loadChannels().catch(()=>{});
-    }
+  // auto-load (if not loaded elsewhere)
+  if (mainEl && channelsData.length === 0) {
+      loadChannels().catch(()=>{});
+  }
 });
 
 function escapeHtml(s) {
