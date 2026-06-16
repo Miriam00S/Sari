@@ -1,4 +1,19 @@
 const mainEl = document.querySelector('main');
+const filterInput = document.querySelector('.filter__input');
+const suggestionsEl = document.querySelector('.filter__suggestions');
+
+let channelsData = []; // stores original data
+let displayedChannels = []; // currently displayed order
+
+// HELPERS
+function escapeHtml(s) {
+    return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
 
 function formatNumber(v) {
     if (v == null) return '–';
@@ -9,6 +24,51 @@ function formatNumber(v) {
     const opts = Number.isInteger(num) ? { maximumFractionDigits: 0 } : { minimumFractionDigits: 0, maximumFractionDigits: 2 };
     return num.toLocaleString('en-US', opts);
 }
+
+function normalizeText(s) {
+  if (s == null) return '';
+  return String(s)
+    .toLowerCase()
+    .replace(/ą/g, 'a')
+    .replace(/ć/g, 'c')
+    .replace(/ę/g, 'e')
+    .replace(/ł/g, 'l')
+    .replace(/ń/g, 'n')
+    .replace(/ó/g, 'o')
+    .replace(/ś/g, 's')
+    .replace(/ż/g, 'z')
+    .replace(/ź/g, 'z')
+    // also replace composed variants just in case
+    .replace(/Ą/g, 'a')
+    .replace(/Ć/g, 'c')
+    .replace(/Ę/g, 'e')
+    .replace(/Ł/g, 'l')
+    .replace(/Ń/g, 'n')
+    .replace(/Ó/g, 'o')
+    .replace(/Ś/g, 's')
+    .replace(/Ż/g, 'z')
+    .replace(/Ź/g, 'z')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function debounce(fn, wait = 120) {
+  let t;
+  return (...args) => {
+    clearTimeout(t);
+    t = setTimeout(() => fn(...args), wait);
+  };
+}
+
+
+function getNumeric(v) {
+    if (v == null) return NaN;
+    const s = String(v).replace(/[^\d.-]/g, '');
+    const n = Number(s);
+    return Number.isNaN(n) ? NaN : n;
+}
+
+// RENDERING
 
 function createCard(channel) {
     const article = document.createElement('article');
@@ -48,7 +108,7 @@ function createCard(channel) {
 
     // handle image load error -> use placeholder
     thumb?.addEventListener('error', () => {
-        thumb = placeholder;
+        thumb.src = placeholder;
         thumb.classList.add('thumb--broken');
     });
 
@@ -63,7 +123,6 @@ function createCard(channel) {
             url.searchParams.set('utm_timestamp', Date.now());
             window.open(url.toString(), '_blank', 'noopener,noreferrer');
         } catch (e) {
-
             console.warn('Invalid URL for channel:', target);
         }
     });
@@ -71,8 +130,6 @@ function createCard(channel) {
     return article;
 }
 
-let channelsData = []; // stores original data
-let displayedChannels = []; // currently displayed order
 
 function renderChannels(channels) {
     if (!mainEl) return;
@@ -84,11 +141,17 @@ function renderChannels(channels) {
     displayedChannels = Array.isArray(channels) ? channels.slice() : [];
 }
 
-function getNumeric(v) {
-    if (v == null) return NaN;
-    const s = String(v).replace(/[^\d.-]/g, '');
-    const n = Number(s);
-    return Number.isNaN(n) ? NaN : n;
+
+// SORTING 
+
+function getSelectedSortCriteria() {
+    const checked = document.querySelector('input[name="sort"]:checked');
+    if (!checked) return null;
+    if (checked.id === 'sort-title') return 'title';
+    if (checked.id === 'sort-subscribers') return 'subscribers';
+    if (checked.id === 'sort-videos') return 'videos';
+    if (checked.id === 'sort-views') return 'views';
+    return null;
 }
 
 function sortAndRender(criteria) {
@@ -118,69 +181,7 @@ function sortAndRender(criteria) {
     renderChannels(copy);
 }
 
-function getSelectedSortCriteria() {
-    const checked = document.querySelector('input[name="sort"]:checked');
-    if (!checked) return null;
-    if (checked.id === 'sort-title') return 'title';
-    if (checked.id === 'sort-subscribers') return 'subscribers';
-    if (checked.id === 'sort-videos') return 'videos';
-    if (checked.id === 'sort-views') return 'views';
-    return null;
-}
-
-// loadChannels saves channelsData
-function loadChannels(url = './channels.json') {
-    return fetch(url)
-        .then(async r => {
-            if (!r.ok) {
-                const body = await r.text().catch(()=>'<no body>');
-                throw new Error('Fetch error: ' + r.status + ' — ' + body);
-            }
-            return r.json();
-        })
-        .then(data => {
-            channelsData = Array.isArray(data) ? data : (data.items || []);
-            // initial render
-            renderChannels(channelsData);
-            return data;
-        })
-        .catch(err => {
-            console.error('Failed to load channels.json', err);
-            if (mainEl) mainEl.textContent = 'Error loading channel data.';
-            throw err;
-        });
-}
-
-// helper: normalize string (lowercase + map Polish diacritics -> base letters)
-function normalizeText(s) {
-  if (s == null) return '';
-  return String(s)
-    .toLowerCase()
-    .replace(/ą/g, 'a')
-    .replace(/ć/g, 'c')
-    .replace(/ę/g, 'e')
-    .replace(/ł/g, 'l')
-    .replace(/ń/g, 'n')
-    .replace(/ó/g, 'o')
-    .replace(/ś/g, 's')
-    .replace(/ż/g, 'z')
-    .replace(/ź/g, 'z')
-    // also replace composed variants just in case
-    .replace(/Ą/g, 'a')
-    .replace(/Ć/g, 'c')
-    .replace(/Ę/g, 'e')
-    .replace(/Ł/g, 'l')
-    .replace(/Ń/g, 'n')
-    .replace(/Ó/g, 'o')
-    .replace(/Ś/g, 's')
-    .replace(/Ż/g, 'z')
-    .replace(/Ź/g, 'z')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-const filterInput = document.querySelector('.filter__input');
-const suggestionsEl = document.querySelector('.filter__suggestions');
+// FILTERING
 
 function updateSuggestions(query) {
   if (!suggestionsEl) return;
@@ -210,7 +211,6 @@ function updateSuggestions(query) {
   suggestionsEl.setAttribute('aria-hidden', 'false');
 }
 
-// filter channels by query (use full dataset so results match suggestions)
 function filterChannelsByQuery(query) {
   const q = normalizeText(query);
   const base = channelsData || [];
@@ -221,21 +221,7 @@ function filterChannelsByQuery(query) {
   });
 }
 
-// debounce helper
-function debounce(fn, wait = 120) {
-  let t;
-  return (...args) => {
-    clearTimeout(t);
-    t = setTimeout(() => fn(...args), wait);
-  };
-}
-
-// input listener
-if (filterInput) {
-  let suggestionActiveIndex = -1;
-
-  // helper: highlight a suggestion by index
-  function highlightSuggestion(index) {
+function highlightSuggestion(index) {
     if (!suggestionsEl) return;
     const items = Array.from(suggestionsEl.querySelectorAll('li'));
     items.forEach((li, i) => {
@@ -249,6 +235,12 @@ if (filterInput) {
       suggestionActiveIndex = -1;
     }
   }
+
+
+// input listener
+if (filterInput) {
+  let suggestionActiveIndex = -1;
+
 
   const onInput = debounce(() => {
     const q = filterInput.value;
@@ -332,6 +324,52 @@ if (clearBtn) {
   });
 }
 
+// close suggestions when clicking outside (and on touch)
+function closeSuggestionsIfOutside(ev) {
+  if (!suggestionsEl) return;
+  // already hidden -> nothing to do
+  if (suggestionsEl.getAttribute('aria-hidden') === 'true') return;
+  const tgt = ev.target;
+  // if click/touch is inside input or suggestions, keep open
+  if (filterInput.contains(tgt) || suggestionsEl.contains(tgt)) return;
+  // otherwise close and reset highlight
+  suggestionsEl.setAttribute('aria-hidden', 'true');
+  highlightSuggestion(-1);
+}
+
+document.addEventListener('click', closeSuggestionsIfOutside);
+document.addEventListener('touchstart', closeSuggestionsIfOutside);
+
+
+
+// DATA LOADING
+
+// loadChannels saves channelsData
+function loadChannels(url = './channels.json') {
+    return fetch(url)
+        .then(async r => {
+            if (!r.ok) {
+                const body = await r.text().catch(()=>'<no body>');
+                throw new Error('Fetch error: ' + r.status + ' — ' + body);
+            }
+            return r.json();
+        })
+        .then(data => {
+            channelsData = Array.isArray(data) ? data : (data.items || []);
+            // initial render
+            renderChannels(channelsData);
+            return data;
+        })
+        .catch(err => {
+            console.error('Failed to load channels.json', err);
+            if (mainEl) mainEl.textContent = 'Error loading channel data.';
+            throw err;
+        });
+}
+
+
+
+
 document.addEventListener('DOMContentLoaded', () => {
   // listen for radio changes
   document.querySelectorAll('input[name="sort"]').forEach(radio => {
@@ -360,14 +398,11 @@ document.addEventListener('DOMContentLoaded', () => {
       });
   }
 
-  // Night mode toggle: remember choice in localStorage
+  // Night mode toggle: remember choice only in DOM class, do NOT persist to localStorage
   const nightBtn = document.querySelector('.header__icon--night');
   function applyNightMode(enabled) {
     document.body.classList.toggle('dark', !!enabled);
-    try {
-      if (enabled) localStorage.setItem('nightMode', '1');
-      else localStorage.removeItem('nightMode');
-    } catch (e) { /* ignore storage errors */ }
+    // no localStorage writes here anymore
   }
 
   if (nightBtn) {
@@ -376,13 +411,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // initialize from storage (or system preference fallback)
-  const stored = (() => {
-    try { return localStorage.getItem('nightMode'); } catch (e) { return null; }
-  })();
-  if (stored !== null) {
-    applyNightMode(stored === '1');
-  } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+  // initialize from system preference only (no stored preference read)
+  if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
     applyNightMode(true);
   }
 
@@ -390,37 +420,64 @@ document.addEventListener('DOMContentLoaded', () => {
   if (mainEl && channelsData.length === 0) {
       loadChannels().catch(()=>{});
   }
+
+  // STORAGE
+
+  // persist visit info: count, lastVisit and currentVisit (e.g. "29 wrz. 2020")
+  function formatPolishDate(d) {
+    const months = ['sty.', 'lut.', 'mar.', 'kwi.', 'maj.', 'cze.', 'lip.', 'sie.', 'wrz.', 'paź.', 'lis.', 'gru.'];
+    return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+  }
+
+  function setCookie(name, value, days = 3650) {
+    try {
+      const expires = new Date(Date.now() + days * 864e5).toUTCString();
+      document.cookie = `${encodeURIComponent(name)}=${encodeURIComponent(value)}; path=/; expires=${expires}`;
+    } catch (e) {}
+  }
+  function getCookie(name) {
+    try {
+      const m = document.cookie.match('(?:^|; )' + name.replace(/([.*+?^${}()|[\]\\])/g, '\\$1') + '=([^;]*)');
+      return m ? decodeURIComponent(m[1]) : null;
+    } catch (e) { return null; }
+  }
+
+  (function recordVisit() {
+    const now = new Date();
+    const nowStr = formatPolishDate(now);
+
+    try {
+      // use localStorage for visit counts / dates (but do not store raw timestamp)
+      const prevCurrent = localStorage.getItem('currentVisit');
+      const prevLast = localStorage.getItem('lastVisit') || prevCurrent || null;
+      const count = Number(localStorage.getItem('visitCount') || '0') + 1;
+
+      if (prevCurrent) localStorage.setItem('lastVisit', prevCurrent);
+      else if (prevLast) localStorage.setItem('lastVisit', prevLast);
+
+      localStorage.setItem('currentVisit', nowStr);
+      localStorage.setItem('visitCount', String(count));
+      // removed: localStorage.setItem('currentVisitTs', String(now.getTime()));
+    } catch (e) {
+      // fallback to cookies if localStorage unavailable
+      const prevCurrent = getCookie('currentVisit');
+      const prevLast = getCookie('lastVisit') || prevCurrent || null;
+      const count = Number(getCookie('visitCount') || '0') + 1;
+
+      if (prevCurrent) setCookie('lastVisit', prevCurrent);
+      else if (prevLast) setCookie('lastVisit', prevLast);
+
+      setCookie('currentVisit', nowStr);
+      setCookie('visitCount', String(count));
+    }
+  })();
 });
 
-function escapeHtml(s) {
-    return String(s)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
-}
 
-// expose helper functions for later manipulation (filter, sort etc.)
+// expose for testing
 window.channelsApp = {
     loadChannels,
     renderChannels,
     createCard,
     formatNumber
 };
-
-// close suggestions when clicking outside (and on touch)
-  function closeSuggestionsIfOutside(ev) {
-    if (!suggestionsEl) return;
-    // already hidden -> nothing to do
-    if (suggestionsEl.getAttribute('aria-hidden') === 'true') return;
-    const tgt = ev.target;
-    // if click/touch is inside input or suggestions, keep open
-    if (filterInput.contains(tgt) || suggestionsEl.contains(tgt)) return;
-    // otherwise close and reset highlight
-    suggestionsEl.setAttribute('aria-hidden', 'true');
-    highlightSuggestion(-1);
-  }
-
-  document.addEventListener('click', closeSuggestionsIfOutside);
-  document.addEventListener('touchstart', closeSuggestionsIfOutside);
