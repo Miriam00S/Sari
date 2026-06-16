@@ -249,9 +249,20 @@ if (filterInput) {
 
   const onInput = debounce(() => {
     const q = filterInput.value;
+
+    // remove any checked sort radios when user types -> treat as manual filter (no active sort)
+    document.querySelectorAll('input[name="sort"]').forEach(r => r.checked = false);
+
     updateSuggestions(q);
-    const filtered = filterChannelsByQuery(q);
-    renderChannels(filtered);
+
+    if (!q) {
+      // empty query -> restore original data order
+      renderChannels(channelsData);
+    } else {
+      const filtered = filterChannelsByQuery(q);
+      renderChannels(filtered);
+    }
+
     // reset active suggestion when user types
     highlightSuggestion(-1);
   }, 120);
