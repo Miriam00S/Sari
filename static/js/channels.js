@@ -15,10 +15,16 @@ function createCard(channel) {
     article.classList.add('channel-card');
     article.dataset.title = channel.title || '';
 
+    const placeholder = 'data:image/svg+xml;utf8,' +
+      '<svg xmlns="http://www.w3.org/2000/svg" width="180" height="180">' +
+      '<rect fill="%23eee" width="100%" height="100%"/>' +
+      '<text x="50%" y="50%" font-size="14" fill="%23999" text-anchor="middle" dominant-baseline="central">No image</text>' +
+      '</svg>';
+
     const thumbUrl = channel.thumbnails?.medium?.url || channel.thumbnails?.default?.url || '';
 
     article.innerHTML = `
-        <img class="thumb" src="${thumbUrl}" alt="${escapeHtml(channel.title || '')}">
+        <img class="thumb" src="${thumbUrl || placeholder}" loading="lazy" decoding="async" alt="${escapeHtml(channel.title || '')}">
         <div class="content">
             <h3 class="title">${escapeHtml(channel.title || '')}</h3>
             <div class="meta">
@@ -40,19 +46,33 @@ function createCard(channel) {
 
     const thumb = article.querySelector('.thumb');
 
+    // handle image load error -> use placeholder
+    thumb?.addEventListener('error', () => {
+        thumb = placeholder;
+        thumb.classList.add('thumb--broken');
+    });
+
+    // safe open URL (when customUrl missing)
     thumb?.addEventListener('click', () => {
-        const url = new URL(channel.customUrl);
-
-        url.searchParams.set('utm_source', 'channels_page');
-        url.searchParams.set('utm_medium', 'thumbnail');
-        url.searchParams.set('utm_timestamp', Date.now());
-
-        window.open(url.toString(), '_blank', 'noopener,noreferrer');
+        const target = channel.customUrl || channel.url;
+        if (!target) return;
+        try {
+            const url = new URL(target, window.location.href);
+            url.searchParams.set('utm_source', 'channels_page');
+            url.searchParams.set('utm_medium', 'thumbnail');
+            url.searchParams.set('utm_timestamp', Date.now());
+            window.open(url.toString(), '_blank', 'noopener,noreferrer');
+        } catch (e) {
+            // ignore invalid URL
+            console.warn('Invalid URL for channel:', target);
+        }
     });
 
     return article;
 }
 
+let channelsData = []; // stores original data
+let displayedChannels = []; // currently displayed order
 
 function renderChannels(channels) {
     if (!mainEl) return;
@@ -60,9 +80,9 @@ function renderChannels(channels) {
     const fragment = document.createDocumentFragment();
     channels.forEach(ch => fragment.appendChild(createCard(ch)));
     mainEl.appendChild(fragment);
+    // remember current view
+    displayedChannels = Array.isArray(channels) ? channels.slice() : [];
 }
-
-let channelsData = []; // przechowuje oryginalne dane
 
 function getNumeric(v) {
     if (v == null) return NaN;
@@ -89,7 +109,7 @@ function sortAndRender(criteria) {
             copy.sort((a, b) => (getNumeric(b.statistics?.viewCount) || 0) - (getNumeric(a.statistics?.viewCount) || 0));
             break;
         default:
-            // domyślnie przywróć oryginalny porządek
+            // keep original order
             break;
     }
 
@@ -106,7 +126,7 @@ function getSelectedSortCriteria() {
     return null;
 }
 
-// zamień/rozszerz loadChannels tak, żeby zapisywała channelsData
+// loadChannels now saves channelsData
 function loadChannels(url = './channels.json') {
     return fetch(url)
         .then(async r => {
@@ -118,19 +138,19 @@ function loadChannels(url = './channels.json') {
         })
         .then(data => {
             channelsData = Array.isArray(data) ? data : (data.items || []);
-            // początkowy render
+            // initial render
             renderChannels(channelsData);
             return data;
         })
         .catch(err => {
-            console.error('Nie udało się wczytać channels.json', err);
-            if (mainEl) mainEl.textContent = 'Błąd ładowania danych kanałów.';
+            console.error('Failed to load channels.json', err);
+            if (mainEl) mainEl.textContent = 'Error loading channel data.';
             throw err;
         });
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    // nasłuch na zmiany radio
+    // listen for radio changes
     document.querySelectorAll('input[name="sort"]').forEach(radio => {
         radio.addEventListener('change', () => {
             const crit = getSelectedSortCriteria();
@@ -138,7 +158,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // przycisk Clear — odznacza i przywraca oryginalny porządek
+    // Clear button — uncheck radios and restore original order
     const clearBtn = document.querySelector('.sort .button');
     if (clearBtn) {
         clearBtn.addEventListener('click', () => {
@@ -147,17 +167,22 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // auto-load (jeśli nie masz już innego auto-loada)
+    // click on sort icon -> reverse current rendering order
+    const sortIcon = document.querySelector('.sort__icon');
+    if (sortIcon) {
+        sortIcon.addEventListener('click', () => {
+            if (!displayedChannels || !displayedChannels.length) return;
+            displayedChannels.reverse();
+            renderChannels(displayedChannels);
+        });
+    }
+
+    // auto-load (if not loaded elsewhere)
     if (mainEl && channelsData.length === 0) {
         loadChannels().catch(()=>{});
     }
 });
 
-// utility
-function shorten(text, max) {
-    if (!text) return '';
-    return text.length > max ? text.slice(0, max).trim() + '…' : text;
-}
 function escapeHtml(s) {
     return String(s)
         .replace(/&/g, '&amp;')
@@ -174,8 +199,3 @@ window.channelsApp = {
     createCard,
     formatNumber
 };
-
-// auto-load on DOMContentLoaded
-document.addEventListener('DOMContentLoaded', () => {
-    if (mainEl) loadChannels().catch(() => {});
-});

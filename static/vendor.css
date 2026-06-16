@@ -214,11 +214,25 @@ button:-moz-focusring {
 }
 
 .sort__header {
-  font-weight: bold;
-  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between; /* h3 left, img right */
+  gap: 8px;
+  width: 100%;
   margin: 0 0 8px 0;
 }
-
+.sort__header h3 {
+  margin: 0;
+  font-weight: bold;
+  font-size: 20px;
+}
+.sort__icon {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  display: inline-block;
+  cursor: pointer;
+}
 .wrapper {
   font-family: 'Lato', sans-serif;
   background: #eceff1;
