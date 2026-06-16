@@ -398,23 +398,34 @@ document.addEventListener('DOMContentLoaded', () => {
       });
   }
 
-  // Night mode toggle: remember choice only in DOM class, do NOT persist to localStorage
-  const nightBtn = document.querySelector('.header__icon--night');
+  // --- Night mode toggle (persist choice in localStorage)
   function applyNightMode(enabled) {
     document.body.classList.toggle('dark', !!enabled);
-    // no localStorage writes here anymore
+    try {
+      if (enabled) localStorage.setItem('nightMode', '1');
+      else localStorage.removeItem('nightMode');
+    } catch (e) {
+      // ignore storage errors (private mode, quotas)
+    }
   }
 
+  const nightBtn = document.querySelector('.header__icon--night');
   if (nightBtn) {
     nightBtn.addEventListener('click', () => {
       applyNightMode(!document.body.classList.contains('dark'));
     });
   }
 
-  // initialize from system preference only (no stored preference read)
-  if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-    applyNightMode(true);
-  }
+  // initialize night mode: prefer stored setting, fallback to system preference
+  (function initNightMode() {
+    let stored = null;
+    try { stored = localStorage.getItem('nightMode'); } catch (e) { stored = null; }
+    if (stored !== null) {
+      applyNightMode(stored === '1');
+    } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      applyNightMode(true);
+    }
+  })();
 
   // auto-load (if not loaded elsewhere)
   if (mainEl && channelsData.length === 0) {
