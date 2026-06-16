@@ -4,6 +4,7 @@ const suggestionsEl = document.querySelector('.filter__suggestions');
 
 let channelsData = []; // stores original data
 let displayedChannels = []; // currently displayed order
+let suggestionActiveIndex = -1; // <--- single shared index for suggestions
 
 // HELPERS
 function escapeHtml(s) {
@@ -19,7 +20,7 @@ function formatNumber(v) {
     if (v == null) return '–';
     const s = String(v).replace(/[^\d.-]/g, '');
     const num = Number(s);
-    if (Number.isNaN(num)) return v;
+    if (Number.isNaN(num))  return v;
 
     const opts = Number.isInteger(num) ? { maximumFractionDigits: 0 } : { minimumFractionDigits: 0, maximumFractionDigits: 2 };
     return num.toLocaleString('en-US', opts);
@@ -189,26 +190,28 @@ function updateSuggestions(query) {
   if (!q) {
     suggestionsEl.innerHTML = '';
     suggestionsEl.setAttribute('aria-hidden', 'true');
+    suggestionActiveIndex = -1;
     return;
   }
-  // find up to 8 matching channel titles (by normalized title)
-  const matches = (channelsData || [])
-    .map(ch => ({ title: ch.title || '', ch }))
-    .map(o => ({ title: o.title, norm: normalizeText(o.title), ch: o.ch }))
-    .filter(o => o.norm.includes(q))
-    .slice(0, 8);
+
+
+  const matches = filterChannelsByQuery(query).slice(0, 8);
 
   if (!matches.length) {
     suggestionsEl.innerHTML = '';
     suggestionsEl.setAttribute('aria-hidden', 'true');
+    suggestionActiveIndex = -1;
     return;
   }
 
-  suggestionsEl.innerHTML = matches.map((m, idx) => {
-    // highlight matched
-    return `<li role="option" data-index="${idx}" data-title="${escapeHtml(m.title)}">${escapeHtml(m.title)}</li>`;
+  suggestionsEl.innerHTML = matches.map((ch, idx) => {
+    const title = ch.title || ch.localized?.title || '';
+    return `<li role="option" data-index="${idx}" data-title="${escapeHtml(title)}">${escapeHtml(title)}</li>`;
   }).join('');
   suggestionsEl.setAttribute('aria-hidden', 'false');
+
+  // highlight the first suggestion immediately
+  highlightSuggestion(0);
 }
 
 function filterChannelsByQuery(query) {
@@ -239,9 +242,6 @@ function highlightSuggestion(index) {
 
 // input listener
 if (filterInput) {
-  let suggestionActiveIndex = -1;
-
-
   const onInput = debounce(() => {
     const q = filterInput.value;
 
@@ -258,8 +258,6 @@ if (filterInput) {
       renderChannels(filtered);
     }
 
-    // reset active suggestion when user types
-    highlightSuggestion(-1);
   }, 120);
 
   filterInput.addEventListener('input', onInput);
