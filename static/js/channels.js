@@ -92,8 +92,10 @@ function getNumeric(v) {
 }
 
 function sortAndRender(criteria) {
-    if (!channelsData || !channelsData.length) return;
-    const copy = channelsData.slice();
+    const base = (Array.isArray(displayedChannels) && displayedChannels.length) ? displayedChannels.slice() : (channelsData.slice ? channelsData.slice() : []);
+    if (!base || !base.length) return;
+
+    const copy = base;
 
     switch (criteria) {
         case 'title':
@@ -208,11 +210,12 @@ function updateSuggestions(query) {
   suggestionsEl.setAttribute('aria-hidden', 'false');
 }
 
-// filter channels by query (match only normalized title to stay consistent with suggestions)
+// filter channels by query (use full dataset so results match suggestions)
 function filterChannelsByQuery(query) {
   const q = normalizeText(query);
-  if (!q) return channelsData.slice();
-  return (channelsData || []).filter(ch => {
+  const base = channelsData || [];
+  if (!q) return base.slice();
+  return base.filter(ch => {
     const title = normalizeText(ch.title || ch.localized?.title || '');
     return title.includes(q);
   });
@@ -379,3 +382,19 @@ window.channelsApp = {
     createCard,
     formatNumber
 };
+
+// close suggestions when clicking outside (and on touch)
+  function closeSuggestionsIfOutside(ev) {
+    if (!suggestionsEl) return;
+    // already hidden -> nothing to do
+    if (suggestionsEl.getAttribute('aria-hidden') === 'true') return;
+    const tgt = ev.target;
+    // if click/touch is inside input or suggestions, keep open
+    if (filterInput.contains(tgt) || suggestionsEl.contains(tgt)) return;
+    // otherwise close and reset highlight
+    suggestionsEl.setAttribute('aria-hidden', 'true');
+    highlightSuggestion(-1);
+  }
+
+  document.addEventListener('click', closeSuggestionsIfOutside);
+  document.addEventListener('touchstart', closeSuggestionsIfOutside);
