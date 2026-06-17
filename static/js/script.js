@@ -387,13 +387,13 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // click on sort icon - reverse current rendering order
-  const sortIcon = document.querySelector('.sort__icon');
-  if (sortIcon) {
-      sortIcon.addEventListener('click', () => {
-          if (!displayedChannels || !displayedChannels.length) return;
-          displayedChannels.reverse();
-          renderChannels(displayedChannels);
-      });
+  const sortIconBtn = document.querySelector('.sort__icon-button');
+  if (sortIconBtn) {
+    sortIconBtn.addEventListener('click', (ev) => {
+      if (!displayedChannels || !displayedChannels.length) return;
+      displayedChannels.reverse();
+      renderChannels(displayedChannels);
+    });
   }
 
   // --- Night mode toggle (persist choice in localStorage)
@@ -407,7 +407,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  const nightBtn = document.querySelector('.header__icon--night');
+  const nightBtn = document.querySelector('.header__icon-button');
   if (nightBtn) {
     nightBtn.addEventListener('click', () => {
       applyNightMode(!document.body.classList.contains('dark'));

@@ -240,6 +240,18 @@ button:-moz-focusring {
   display: inline-block;
   cursor: pointer;
 }
+.sort__icon-button {
+    background: none;
+    border: none;
+    padding: 0;
+    margin: 0;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+
 .wrapper {
   font-family: 'Lato', sans-serif;
   background: #eceff1;
@@ -276,6 +288,16 @@ button:-moz-focusring {
   display: inline-block;
 }
 
+.header__icon-button {
+    background: none;
+    border: none;
+    padding: 0;
+    margin: 0;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
 
 .wrapper__filter {
   order: 1;
